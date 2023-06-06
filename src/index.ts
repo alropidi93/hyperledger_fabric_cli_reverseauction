@@ -57,7 +57,7 @@ app.post('/create-auction',async (req, res) => {
     var message = "";
     try {
         await setConnection();
-        await createAuction(req.body.auctionCode, req.body.entityCode,req.body.owner,req.body.datetimeCreation);
+        await createAuction(req.body.auctionCode, req.body.entityCode,req.body.owner,req.body.datetimeCreation, req.body.item);
         message = "Creado OKi" 
     } catch (error) {
         console.log(error);
@@ -70,7 +70,26 @@ app.post('/create-auction',async (req, res) => {
     
     res.send({"message":message}) 
     
+})
+
+app.post('/create-bid',async (req, res) => {
+    console.log('Creando oferta en la blockchain')
+    console.log(req.body);
+    var message = "";
+    try {
+        await setConnection();
+        await createBid(req.body.codigoSubasta, req.body.codigoPostor, req.body.codigoBienServicio,req.body.primeraOferta,req.body.fechaHoraPrimeraOferta,req.body.owner);
+        message = "Creado OKi" 
+    } catch (error) {
+        console.log(error);
+        console.log("error al crear");
+        closeConnection();
+        message = "Error al crear"
+        res.statusCode = 409;
+    }
+ 
     
+    res.send({"message":message}) 
     
 })
 
@@ -130,13 +149,15 @@ async function getAllAuctions(): Promise<Object> {
     const resultBytes = await contract.evaluateTransaction('GetAllAuctions');
     closeConnection()
     var resultJson = JSON.parse(utf8Decoder.decode(resultBytes));
+    resultJson=  resultJson.filter((obj: { Items: Array<Object>; }) => obj.Items !== undefined )
+
     
     return resultJson;
     
 }
 
 
-async function createAuction (codigoSubasta: string, codigoEntidad:string,propietario:string, fechaHoraCreacion:string){
+async function createAuction (codigoSubasta: string, codigoEntidad:string,propietario:string, fechaHoraCreacion:string, item:object){
     
     console.log("Vamos a crear");
     
@@ -146,12 +167,32 @@ async function createAuction (codigoSubasta: string, codigoEntidad:string,propie
         codigoEntidad,
         fechaHoraCreacion,
         propietario,
+        JSON.stringify(item)
     );
     console.log("Se creó correctamente en blockchain");
-    
-    closeConnection();
+
 
 }
+
+async function createBid (codigoSubasta: string, codigoPostor:string,codigoBienServicio:string,primeraOferta:string , fechaHoraPrimeraOferta:string,propietario:string,){
+    
+    console.log("Vamos a crear");
+    console.log(primeraOferta);
+    
+    await contract.submitTransaction(
+        'CreateBid',
+        codigoSubasta,
+        codigoPostor,
+        codigoBienServicio,
+        primeraOferta,
+        fechaHoraPrimeraOferta,
+        propietario,
+    );
+    console.log("Se creó correctamente en blockchain");
+
+
+}
+
 
 async function newGrpcConnection(): Promise<grpc.Client> {
 
