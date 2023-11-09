@@ -4,33 +4,43 @@ import * as grpc from '@grpc/grpc-js';
 import { connect, Contract, Gateway, Identity, Network, Signer, signers } from '@hyperledger/fabric-gateway';
 import { promises as fs } from 'fs';
 import * as crypto from 'crypto';
+import * as fs2 from 'fs';
 
 const app = express()
 
-const channelName = envOrDefault('CHANNEL_NAME', 'prueba');
-const chaincodeName = envOrDefault('CHAINCODE_NAME', 'auctioncontract');
-const mspId = envOrDefault('MSP_ID', 'Org2MSP');
+const channelName = envOrDefault('CHANNEL_NAME', 'gobiernoperu');
+const chaincodeName = envOrDefault('CHAINCODE_NAME', 'reverseauction');
+const mspId = envOrDefault('MSP_ID', 'Org1MSP');
+// const mspId = envOrDefault('MSP_ID', 'Org3MSP');
 
 // Path to crypto materials.
-const cryptoPath = envOrDefault('CRYPTO_PATH', path.resolve(__dirname, '..', '..', '..', 'test-network', 'organizations', 'peerOrganizations', 'org2.example.com'));
+const cryptoPath = envOrDefault('CRYPTO_PATH', path.resolve(__dirname, '..', '..', '..', 'test-network', 'organizations', 'peerOrganizations', 'org1.example.com'));
+// const cryptoPath = envOrDefault('CRYPTO_PATH', path.resolve(__dirname, '..', '..', '..', 'test-network', 'organizations', 'peerOrganizations', 'org3.example.com'));
 
 // Path to user private key directory.
-const keyDirectoryPath = envOrDefault('KEY_DIRECTORY_PATH', path.resolve(cryptoPath, 'users', 'User1@org2.example.com', 'msp', 'keystore'));
+const keyDirectoryPath = envOrDefault('KEY_DIRECTORY_PATH', path.resolve(cryptoPath, 'users', 'User1@org1.example.com', 'msp', 'keystore'));
+// const keyDirectoryPath = envOrDefault('KEY_DIRECTORY_PATH', path.resolve(cryptoPath, 'users', 'User1@org3.example.com', 'msp', 'keystore'));
 
 // Path to user certificate.
-const certPath = envOrDefault('CERT_PATH', path.resolve(cryptoPath, 'users', 'User1@org2.example.com', 'msp', 'signcerts', 'User1@org2.example.com-cert.pem'));
+const certPath = envOrDefault('CERT_PATH', path.resolve(cryptoPath, 'users', 'User1@org1.example.com', 'msp', 'signcerts', 'User1@org1.example.com-cert.pem'));
+// const certPath = envOrDefault('CERT_PATH', path.resolve(cryptoPath, 'users', 'User1@org3.example.com', 'msp', 'signcerts', 'User1@org3.example.com-cert.pem'));
 
 // Path to peer tls certificate.
-const tlsCertPath = envOrDefault('TLS_CERT_PATH', path.resolve(cryptoPath, 'peers', 'peer0.org2.example.com', 'tls', 'ca.crt'));
+const tlsCertPath = envOrDefault('TLS_CERT_PATH', path.resolve(cryptoPath, 'peers', 'peer0.org1.example.com', 'tls', 'ca.crt'));
+// const tlsCertPath = envOrDefault('TLS_CERT_PATH', path.resolve(cryptoPath, 'peers', 'peer0.org3.example.com', 'tls', 'ca.crt'));
+
+const aesKeyPath = path.resolve(cryptoPath, 'peers', 'peer0.org1.example.com', 'aes', 'aes - copia.key');
+
 
 // Gateway peer endpoint.
-const peerEndpoint = envOrDefault('PEER_ENDPOINT', 'localhost:9051');
+const peerEndpoint = envOrDefault('PEER_ENDPOINT', 'localhost:7051');
+// const peerEndpoint = envOrDefault('PEER_ENDPOINT', 'localhost:11051');
 
 // Gateway peer SSL host name override.
-const peerHostAlias = envOrDefault('PEER_HOST_ALIAS', 'peer0.org2.example.com');
+const peerHostAlias = envOrDefault('PEER_HOST_ALIAS', 'peer0.org1.example.com');
+// const peerHostAlias = envOrDefault('PEER_HOST_ALIAS', 'peer0.org3.example.com');
 
 const utf8Decoder = new TextDecoder();
-// const assetId = `asset${Date.now()}`;
 
 let client:grpc.Client;
 let gateway:Gateway;
@@ -43,10 +53,142 @@ app.use(express.json())
 
 const PORT = 5000
 
+ interface ISpecialInfo {
+    State: Number;
+    CurrentBid: Number;
+    LastBid: Number;
+    IsOpen: boolean;
+ 
+}
+
+app.post('/register-participation/:auctionCode/:bidderCode',async (req, res) => {
+    
+    var message = ""
+    try {
+        await setConnection();
+        var auctionBidder = {"CodigoPostor": req.params.bidderCode,"FechaHoraRegistroPartic":req.body.datetimeReg};
+        await registerParticipation(req.params.auctionCode,auctionBidder);
+        message = "Registro de partcipación OKi" 
+       
+    } catch (error) {
+        message="Error al intentar registrar participación"
+        
+    }
+    closeConnection();
+    res.send({"message":message})
+})
+
+
+app.post('/register-first-bid/:auctionCode/:bidderCode/:goodServiceCode',async (req, res) => {
+
+    var message = ""
+    try {
+        await setConnection();
+        var itemBidder = {"CodigoPostor": req.params.bidderCode,"PrimeraOferta":{"Price":req.body.firstBid,"DatetimeReg":req.body.datetimeReg}};
+        await registerFirstBid(req.params.auctionCode,req.params.goodServiceCode,itemBidder);
+        message = "Registro de primera oferta OKi" 
+       
+    } catch (error) {
+        message="Error al intentar registrar primera oferta"
+        
+    }
+    closeConnection();
+    res.send({"message":message})
+})
+
+app.post('/register-price-bid/:auctionCode/:bidderCode/:goodServiceCode',async (req, res) => {
+
+    var message = ""
+    try {
+        await setConnection();
+        var bid = {"Price":req.body.newBid,"DatetimeReg":req.body.datetimeReg};
+        await registerPriceBid(req.params.auctionCode,req.params.goodServiceCode,req.params.bidderCode,bid);
+        message = "Registro de puja OKi" 
+       
+    } catch (error) {
+        message="Error al intentar registrar puja"
+        
+    }
+    closeConnection();
+    res.send({"message":message})
+})
+
+app.post('/register-buena-pro/:auctionCode/:goodServiceCode',async (req, res) => {
+
+    var message = ""
+    try {
+        console.log("Se va a registrar buena pro");
+        
+        await setConnection();
+        await registerBuenaPro(req.params.auctionCode,req.params.goodServiceCode,req.body.firstBidderEntityCode,req.body.secondBidderEntityCode, req.body.datetimeReg);
+        message = "Registro de buena pro OKi" 
+       
+    } catch (error) {
+        message="Error al intentar registrar buena pro oferta"
+        
+    }
+    closeConnection();
+    res.send({"message":message})
+})
+
+
+app.post('/finish-phase/:code/:phaseCod',async (req, res) => {
+    console.log(req.params.code)
+    var message = ""
+    try {
+        await setConnection();
+        await finishPhase(req.params.code,req.params.phaseCod,req.body.datetimeFinish);
+        message = "Cerrada la etapa OKi" 
+        
+       
+    } catch (error) {
+        message="Error al intentar cerrar fase"
+        
+    }
+    closeConnection();
+    res.send({"message":message})
+})
+
+app.get('/get-auction/:code',async (req, res) => {
+    console.log(req.params.code)
+    await setConnection();
+    var data = await getAuction(req.params.code);
+    closeConnection();
+    res.send(data) 
+})
+
+app.get('/get-auction-decrypt/:code',async (req, res) => {
+    console.log(req.params.code)
+    await setConnection();
+    var data = await getAuctionDecrypt(req.params.code);
+    closeConnection();
+    res.send(data) 
+})
+
+
+
+app.get('/get-special-info-auction/:auctionCode/:bidderCode/:goodServiceCode',async (req, res) => {
+    console.log(req.params.auctionCode)
+    console.log(req.params.bidderCode)
+    console.log(req.params.goodServiceCode)
+    await setConnection();
+    var data = await getSpecialInfoAuction(req.params.auctionCode,req.params.goodServiceCode,req.params.bidderCode);
+    closeConnection();
+    res.send(data) 
+})
+
+app.get('/get-buenapro-info-auction/:auctionCode',async (req, res) => {
+    await setConnection();
+    var data = await getBuenaProInfoAuction(req.params.auctionCode);
+    closeConnection();
+    res.send(data) 
+})
+
 app.get('/list-auctions',async (_, res) => {
     console.log('Probando interacción con blockchain')
     await setConnection();
     var data = await getAllAuctions();
+    closeConnection();
     
     res.send(data) 
 })
@@ -57,12 +199,55 @@ app.post('/create-auction',async (req, res) => {
     var message = "";
     try {
         await setConnection();
-        await createAuction(req.body.auctionCode, req.body.entityCode,req.body.owner,req.body.datetimeCreation, req.body.item);
+
+        var convocatoriaPhase = {"DatetimeInit":req.body.datetimeInitConv,"DatetimeEnd":req.body.datetimeEndConv,"DatetimeEndStamp":""} 
+        var primeraOfertaPhase = {"DatetimeInit":req.body.datetimeInitFirstBid,"DatetimeEnd":req.body.datetimeEndFirstBid,"DatetimeEndStamp":""} 
+        var pujaPhase = {"DatetimeInit":req.body.datetimeInitPriceBid,"DatetimeEnd":req.body.datetimeEndPriceBid,"DatetimeEndStamp":""} 
+        var buenaProPhase = {"DatetimeInit":req.body.datetimeInitBuenaPro,"DatetimeEnd":req.body.datetimeEndBuenaPro,"DatetimeEndStamp":""} 
+        console.log(convocatoriaPhase);
+        console.log(primeraOfertaPhase);
+        console.log(pujaPhase);
+        console.log(buenaProPhase);
+        console.log("----------------------");
+        
+        
+        
+        
+        
+        await createAuction(req.body.auctionCode, req.body.entityCode,req.body.owner,req.body.datetimeCreation,req.body.referenceValue, req.body.item,
+            convocatoriaPhase,primeraOfertaPhase,pujaPhase,buenaProPhase);
         message = "Creado OKi" 
     } catch (error) {
         console.log(error);
         console.log("error al crear");
-        closeConnection();
+        message = "Error al crear"
+        res.statusCode = 409;
+    }
+    closeConnection();
+    
+    res.send({"message":message}) 
+    
+})
+
+app.post('/create-auction-encrypt',async (req, res) => {
+    console.log('Creando subasta en la blockchain')
+    console.log(req.body);
+    var message = "";
+    try {
+        await setConnection();
+
+        var convocatoriaPhase = {"DatetimeInit":req.body.datetimeInitConv,"DatetimeEnd":req.body.datetimeEndConv,"DatetimeEndStamp":""} 
+        var primeraOfertaPhase = {"DatetimeInit":req.body.datetimeInitFirstBid,"DatetimeEnd":req.body.datetimeEndFirstBid,"DatetimeEndStamp":""} 
+        var pujaPhase = {"DatetimeInit":req.body.datetimeInitPriceBid,"DatetimeEnd":req.body.datetimeEndPriceBid,"DatetimeEndStamp":""} 
+        var buenaProPhase = {"DatetimeInit":req.body.datetimeInitBuenaPro,"DatetimeEnd":req.body.datetimeEndBuenaPro,"DatetimeEndStamp":""} 
+   
+        
+        await createAuctionEncrypt(req.body.auctionCode, req.body.entityCode,req.body.owner,req.body.datetimeCreation,req.body.referenceValue, req.body.item,
+            convocatoriaPhase,primeraOfertaPhase,pujaPhase,buenaProPhase);
+        message = "Creado OKi" 
+    } catch (error) {
+        console.log(error);
+        console.log("error al crear");
         message = "Error al crear"
         res.statusCode = 409;
     }
@@ -141,23 +326,128 @@ function closeConnection(){
     client.close();
 }
 
+async function registerParticipation(auctionCode:string, auctionBidder :object) {
+    await contract.submitTransaction(
+        'RegisterParticipation',
+        auctionCode,
+        JSON.stringify(auctionBidder),
+    );
+    console.log("Se registró correctamente la participación en la blockchain");
+    
+}
+
+async function registerFirstBid(auctionCode:string,goodServiceCode:string, itemBidder :object) {
+    console.log("registerFirtBid");
+    
+    console.log(auctionCode);
+    console.log(goodServiceCode);
+    console.log(itemBidder);
+    
+    await contract.submitTransaction(
+        'RegisterFirstBid',
+        auctionCode,
+        goodServiceCode,
+        JSON.stringify(itemBidder),
+    );
+    console.log("Se registró correctamente la primera oferta en el item "+ goodServiceCode+ " en la blockchain");
+    
+}
+
+async function registerPriceBid(auctionCode:string, goodServiceCode:string , bidderCode:string, bid: object){
+  
+    
+    await contract.submitTransaction(
+        'RegisterPriceBid',
+        auctionCode,
+        goodServiceCode,
+        bidderCode,
+        JSON.stringify(bid),
+    );
+    console.log("Se registró correctamente la puja en el item "+ goodServiceCode+ " por parte del postor "+ bidderCode+" en la blockchain");
+
+}
+
+async function registerBuenaPro(auctionCode:string, goodServiceCode:string , firstBidderEntityCode:string, secondBidderEntityCode: string, datetimeReg:string){
+    console.log("Se va a enviar registro de buena pro a la blockchain");
+    
+    await contract.submitTransaction(
+        'RegisterBuenaPro',
+        auctionCode,
+        goodServiceCode,
+        firstBidderEntityCode,
+        secondBidderEntityCode,
+        datetimeReg
+    );
+    console.log("Se registró correctamente la buena pro para el bien o servicio"+ goodServiceCode+ " en la blockchain");
+
+}
+
+
+async function finishPhase(auctionCode:string, phaseCode:string, datetimeFinish :string) {
+    await contract.submitTransaction(
+        'FinishPhase',
+        auctionCode,
+        datetimeFinish,
+        phaseCode,
+
+
+    );
+    console.log("Se creó correctamente en blockchain");
+    
+}   
+
+
+async function getAuction(code: string): Promise<Object> {
+    const resultBytes = await contract.evaluateTransaction('GetAuction',code);
+    var resultJson = JSON.parse(utf8Decoder.decode(resultBytes));
+
+
+
+    return resultJson;
+}
+
+async function getAuctionDecrypt(code: string): Promise<Object> {
+    var aesKey = fs2.readFileSync(aesKeyPath, 'utf-8');
+    const resultBytes = await contract.evaluateTransaction('GetAuctionDecrypt',aesKey, code);
+    var resultJson = JSON.parse(utf8Decoder.decode(resultBytes));
+
+
+
+    return resultJson;
+}
+
+async function getSpecialInfoAuction(auctionCode:string, goodServiceCode:string , bidderCode:string,): Promise<ISpecialInfo> {
+    const resultBytes = await contract.evaluateTransaction('GetSpecialInfo',auctionCode,goodServiceCode,bidderCode);
+    var resultJson = JSON.parse(utf8Decoder.decode(resultBytes));
+    return resultJson;
+}
+
+async function getBuenaProInfoAuction(auctionCode:string): Promise<Object> {
+    const resultBytes = await contract.evaluateTransaction('GetBuenaProInfo',auctionCode);
+    if(resultBytes.length == 0) return []
+    var resultJson = JSON.parse(utf8Decoder.decode(resultBytes));
+    return resultJson;
+}
+
+
 
 
 async function getAllAuctions(): Promise<Object> {
     console.log('\n--> Evaluate Transaction: GetAllauctions, function returns all the current auctions on the ledger');
-    await setConnection();
     const resultBytes = await contract.evaluateTransaction('GetAllAuctions');
-    closeConnection()
-    var resultJson = JSON.parse(utf8Decoder.decode(resultBytes));
-    resultJson=  resultJson.filter((obj: { Items: Array<Object>; }) => obj.Items !== undefined )
-
     
-    return resultJson;
+    console.log(resultBytes == null  || resultBytes.length == 0);
+    if(resultBytes.length == 0) return []
+    var resultJson = JSON.parse(utf8Decoder.decode(resultBytes));
+    resultJson=  resultJson.filter((obj: { Items: Array<Object>; }) => obj.Items !== undefined ) //esto podría salir
+    return resultJson 
+    
     
 }
 
 
-async function createAuction (codigoSubasta: string, codigoEntidad:string,propietario:string, fechaHoraCreacion:string, item:object){
+async function createAuction (codigoSubasta: string, codigoEntidad:string,propietario:string, fechaHoraCreacion:string, referenceValue: number, item:object,
+    convocatoriaPhase:object, primeraOfertaPhase :object, pujaPhase :object, buenaProPhase :object){
     
     console.log("Vamos a crear");
     
@@ -166,13 +456,46 @@ async function createAuction (codigoSubasta: string, codigoEntidad:string,propie
         codigoSubasta,
         codigoEntidad,
         fechaHoraCreacion,
+        referenceValue.toString(),
         propietario,
-        JSON.stringify(item)
+        JSON.stringify(item),
+        JSON.stringify(convocatoriaPhase),
+        JSON.stringify(primeraOfertaPhase),
+        JSON.stringify(pujaPhase),
+        JSON.stringify(buenaProPhase),
     );
     console.log("Se creó correctamente en blockchain");
 
 
 }
+
+async function createAuctionEncrypt (codigoSubasta: string, codigoEntidad:string,propietario:string, fechaHoraCreacion:string, referenceValue: number, item:object,
+    convocatoriaPhase:object, primeraOfertaPhase :object, pujaPhase :object, buenaProPhase :object){
+    
+    console.log("Vamos a crear");
+    var aesKey = fs2.readFileSync(aesKeyPath, 'utf-8');
+    // var aesKey = await fs.readFile(aesKeyPath);
+    console.log(aesKey);
+    await contract.submitTransaction(
+        'CreateAuctionEncrypt',
+        aesKey,
+        codigoSubasta,
+        codigoEntidad,
+        fechaHoraCreacion,
+        referenceValue.toString(),
+        propietario,
+        JSON.stringify(item),
+        JSON.stringify(convocatoriaPhase),
+        JSON.stringify(primeraOfertaPhase),
+        JSON.stringify(pujaPhase),
+        JSON.stringify(buenaProPhase),
+    );
+    console.log("Se creó correctamente en blockchain");
+
+
+}
+
+
 
 async function createBid (codigoSubasta: string, codigoPostor:string,codigoBienServicio:string,primeraOferta:string , fechaHoraPrimeraOferta:string,propietario:string,){
     
