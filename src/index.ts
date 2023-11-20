@@ -10,34 +10,34 @@ const app = express()
 
 const channelName = envOrDefault('CHANNEL_NAME', 'gobiernoperu');
 const chaincodeName = envOrDefault('CHAINCODE_NAME', 'reverseauction');
-const mspId = envOrDefault('MSP_ID', 'Org1MSP');
+const mspId = envOrDefault('MSP_ID', 'Org2MSP');
 // const mspId = envOrDefault('MSP_ID', 'Org3MSP');
 
 // Path to crypto materials.
-const cryptoPath = envOrDefault('CRYPTO_PATH', path.resolve(__dirname, '..', '..', '..', 'test-network', 'organizations', 'peerOrganizations', 'org1.example.com'));
+const cryptoPath = envOrDefault('CRYPTO_PATH', path.resolve(__dirname, '..', '..', '..', 'test-network', 'organizations', 'peerOrganizations', 'org2.example.com'));
 // const cryptoPath = envOrDefault('CRYPTO_PATH', path.resolve(__dirname, '..', '..', '..', 'test-network', 'organizations', 'peerOrganizations', 'org3.example.com'));
 
 // Path to user private key directory.
-const keyDirectoryPath = envOrDefault('KEY_DIRECTORY_PATH', path.resolve(cryptoPath, 'users', 'User1@org1.example.com', 'msp', 'keystore'));
+const keyDirectoryPath = envOrDefault('KEY_DIRECTORY_PATH', path.resolve(cryptoPath, 'users', 'User1@org2.example.com', 'msp', 'keystore'));
 // const keyDirectoryPath = envOrDefault('KEY_DIRECTORY_PATH', path.resolve(cryptoPath, 'users', 'User1@org3.example.com', 'msp', 'keystore'));
 
 // Path to user certificate.
-const certPath = envOrDefault('CERT_PATH', path.resolve(cryptoPath, 'users', 'User1@org1.example.com', 'msp', 'signcerts', 'User1@org1.example.com-cert.pem'));
+const certPath = envOrDefault('CERT_PATH', path.resolve(cryptoPath, 'users', 'User1@org2.example.com', 'msp', 'signcerts', 'User1@org2.example.com-cert.pem'));
 // const certPath = envOrDefault('CERT_PATH', path.resolve(cryptoPath, 'users', 'User1@org3.example.com', 'msp', 'signcerts', 'User1@org3.example.com-cert.pem'));
 
 // Path to peer tls certificate.
-const tlsCertPath = envOrDefault('TLS_CERT_PATH', path.resolve(cryptoPath, 'peers', 'peer0.org1.example.com', 'tls', 'ca.crt'));
+const tlsCertPath = envOrDefault('TLS_CERT_PATH', path.resolve(cryptoPath, 'peers', 'peer0.org2.example.com', 'tls', 'ca.crt'));
 // const tlsCertPath = envOrDefault('TLS_CERT_PATH', path.resolve(cryptoPath, 'peers', 'peer0.org3.example.com', 'tls', 'ca.crt'));
 
-const aesKeyPath = path.resolve(cryptoPath, 'peers', 'peer0.org1.example.com', 'aes', 'aes - copia.key');
+const aesKeyPath = path.resolve(cryptoPath, 'peers', 'peer0.org2.example.com', 'aes', 'aes.key');
 
 
 // Gateway peer endpoint.
-const peerEndpoint = envOrDefault('PEER_ENDPOINT', 'localhost:7051');
+const peerEndpoint = envOrDefault('PEER_ENDPOINT', 'localhost:9051');
 // const peerEndpoint = envOrDefault('PEER_ENDPOINT', 'localhost:11051');
 
 // Gateway peer SSL host name override.
-const peerHostAlias = envOrDefault('PEER_HOST_ALIAS', 'peer0.org1.example.com');
+const peerHostAlias = envOrDefault('PEER_HOST_ALIAS', 'peer0.org2.example.com');
 // const peerHostAlias = envOrDefault('PEER_HOST_ALIAS', 'peer0.org3.example.com');
 
 const utf8Decoder = new TextDecoder();
@@ -158,9 +158,17 @@ app.get('/get-auction/:code',async (req, res) => {
 })
 
 app.get('/get-auction-decrypt/:code',async (req, res) => {
-    console.log(req.params.code)
-    await setConnection();
-    var data = await getAuctionDecrypt(req.params.code);
+    var data = null
+    try {
+        console.log(req.params.code)
+        await setConnection();
+        data = await getAuctionDecrypt(req.params.code);
+        
+    } catch (error) {
+        console.log(error);
+        console.log("Error al obtener detalle de subasta en modo encriptado");
+        res.statusCode = 403;
+    }
     closeConnection();
     res.send(data) 
 })
@@ -191,6 +199,23 @@ app.get('/list-auctions',async (_, res) => {
     closeConnection();
     
     res.send(data) 
+})
+
+app.get('/list-auctions-decrypt',async (_, res) => {
+
+    var data = null
+    try {
+        await setConnection();
+        data = await  getAllAuctionsDecrypt();
+        
+    } catch (error) {
+        console.log(error);
+        console.log("Error al obtener lista de subastas en modo encriptado");
+        res.statusCode = 403;
+    }
+    closeConnection();
+    res.send(data) 
+
 })
 
 app.post('/create-auction',async (req, res) => {
@@ -230,7 +255,7 @@ app.post('/create-auction',async (req, res) => {
 })
 
 app.post('/create-auction-encrypt',async (req, res) => {
-    console.log('Creando subasta en la blockchain')
+    console.log('Creando subasta en la blockchain en modo encriptado')
     console.log(req.body);
     var message = "";
     try {
@@ -278,9 +303,39 @@ app.post('/create-bid',async (req, res) => {
     
 })
 
+
+app.post('/create-bid-encrypt',async (req, res) => {
+    console.log('Creando oferta en la blockchain en modo encriptado')
+    console.log(req.body);
+    var message = "";
+    try {
+        await setConnection();
+        await createBidEncrypt(req.body.codigoSubasta, req.body.codigoPostor, req.body.codigoBienServicio,req.body.primeraOferta,req.body.fechaHoraPrimeraOferta,req.body.owner);
+        message = "Creado OKi" 
+    } catch (error) {
+        console.log(error);
+        console.log("error al crear en modo encriptado");
+        message = "Error al crear"
+        res.statusCode = 409;
+    }
+ 
+    closeConnection();
+    res.send({"message":message}) 
+    
+})
+
 app.listen(PORT, () => {
     console.log('Server running on port ' + PORT)
 })
+
+
+function getAesContent(){
+
+    return fs2.readFileSync(aesKeyPath, 'utf-8');
+
+
+    
+}
 
 async function setConnection(){
     await displayInputParameters();
@@ -446,6 +501,19 @@ async function getAllAuctions(): Promise<Object> {
 }
 
 
+async function getAllAuctionsDecrypt(): Promise<Object> {
+    console.log('\n--> Evaluate Transaction: GetAllauctions, function returns all the current auctions on the ledger');
+    var aesKey = getAesContent();
+    const resultBytes = await contract.evaluateTransaction('GetAllAuctionsDecrypt', aesKey);
+    
+    console.log(resultBytes == null  || resultBytes.length == 0);
+    if(resultBytes.length == 0) return []
+    var resultJson = JSON.parse(utf8Decoder.decode(resultBytes));
+    resultJson=  resultJson.filter((obj: { Items: Array<Object>; }) => obj.Items !== undefined ) //esto podría salir
+    return resultJson 
+
+}
+
 async function createAuction (codigoSubasta: string, codigoEntidad:string,propietario:string, fechaHoraCreacion:string, referenceValue: number, item:object,
     convocatoriaPhase:object, primeraOfertaPhase :object, pujaPhase :object, buenaProPhase :object){
     
@@ -504,6 +572,26 @@ async function createBid (codigoSubasta: string, codigoPostor:string,codigoBienS
     
     await contract.submitTransaction(
         'CreateBid',
+        codigoSubasta,
+        codigoPostor,
+        codigoBienServicio,
+        primeraOferta,
+        fechaHoraPrimeraOferta,
+        propietario,
+    );
+    console.log("Se creó correctamente en blockchain");
+
+
+}
+
+async function createBidEncrypt (codigoSubasta: string, codigoPostor:string,codigoBienServicio:string,primeraOferta:string , fechaHoraPrimeraOferta:string,propietario:string,){
+    
+    var aesKey = getAesContent();
+    console.log(primeraOferta);
+    
+    await contract.submitTransaction(
+        'CreateBidEncrypt',
+        aesKey,
         codigoSubasta,
         codigoPostor,
         codigoBienServicio,
