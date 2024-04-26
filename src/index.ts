@@ -9,12 +9,12 @@ import * as fs2 from 'fs';
 const app = express()
 
 const channelName = envOrDefault('CHANNEL_NAME', 'gobiernoperu');
-const chaincodeName = envOrDefault('CHAINCODE_NAME', 'reverseauction');
+const chaincodeName = envOrDefault('CHAINCODE_NAME', 'alvaro');
 const mspId = envOrDefault('MSP_ID', 'Org2MSP');
 // const mspId = envOrDefault('MSP_ID', 'Org3MSP');
 
 // Path to crypto materials.
-const cryptoPath = envOrDefault('CRYPTO_PATH', path.resolve(__dirname, '..', '..', '..', 'test-network', 'organizations', 'peerOrganizations', 'org2.example.com'));
+const cryptoPath = 'C:/Users/alvar/Desktop/Test/fabric-samples/test-network/organizations/peerOrganizations/org2.example.com';
 // const cryptoPath = envOrDefault('CRYPTO_PATH', path.resolve(__dirname, '..', '..', '..', 'test-network', 'organizations', 'peerOrganizations', 'org3.example.com'));
 
 // Path to user private key directory.
@@ -238,7 +238,6 @@ app.post('/create-auction',async (req, res) => {
         
         
         
-        
         await createAuction(req.body.auctionCode, req.body.entityCode,req.body.owner,req.body.datetimeCreation,req.body.referenceValue, req.body.item,
             convocatoriaPhase,primeraOfertaPhase,pujaPhase,buenaProPhase);
         message = "Creado OKi" 
@@ -382,8 +381,10 @@ function closeConnection(){
 }
 
 async function registerParticipation(auctionCode:string, auctionBidder :object) {
+    var aesKey = fs2.readFileSync(aesKeyPath, 'utf-8');
     await contract.submitTransaction(
         'RegisterParticipation',
+        aesKey,
         auctionCode,
         JSON.stringify(auctionBidder),
     );
