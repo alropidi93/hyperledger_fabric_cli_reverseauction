@@ -331,8 +331,6 @@ app.listen(PORT, () => {
 function getAesContent(){
 
     return fs2.readFileSync(aesKeyPath, 'utf-8');
-
-
     
 }
 
@@ -398,9 +396,10 @@ async function registerFirstBid(auctionCode:string,goodServiceCode:string, itemB
     console.log(auctionCode);
     console.log(goodServiceCode);
     console.log(itemBidder);
-    
+    var aesKey = fs2.readFileSync(aesKeyPath, 'utf-8');
     await contract.submitTransaction(
         'RegisterFirstBid',
+        aesKey,
         auctionCode,
         goodServiceCode,
         JSON.stringify(itemBidder),
@@ -411,9 +410,10 @@ async function registerFirstBid(auctionCode:string,goodServiceCode:string, itemB
 
 async function registerPriceBid(auctionCode:string, goodServiceCode:string , bidderCode:string, bid: object){
   
-    
+    var aesKey = fs2.readFileSync(aesKeyPath, 'utf-8');
     await contract.submitTransaction(
         'RegisterPriceBid',
+        aesKey,
         auctionCode,
         goodServiceCode,
         bidderCode,
@@ -425,9 +425,10 @@ async function registerPriceBid(auctionCode:string, goodServiceCode:string , bid
 
 async function registerBuenaPro(auctionCode:string, goodServiceCode:string , firstBidderEntityCode:string, secondBidderEntityCode: string, datetimeReg:string){
     console.log("Se va a enviar registro de buena pro a la blockchain");
-    
+    var aesKey = fs2.readFileSync(aesKeyPath, 'utf-8');
     await contract.submitTransaction(
         'RegisterBuenaPro',
+        aesKey,
         auctionCode,
         goodServiceCode,
         firstBidderEntityCode,
@@ -440,8 +441,13 @@ async function registerBuenaPro(auctionCode:string, goodServiceCode:string , fir
 
 
 async function finishPhase(auctionCode:string, phaseCode:string, datetimeFinish :string) {
+    
+    var aesKey = fs2.readFileSync(aesKeyPath, 'utf-8');
+    console.log("Se enviara a blockchain");
+    
     await contract.submitTransaction(
         'FinishPhase',
+        aesKey,
         auctionCode,
         datetimeFinish,
         phaseCode,
@@ -473,7 +479,8 @@ async function getAuctionDecrypt(code: string): Promise<Object> {
 }
 
 async function getSpecialInfoAuction(auctionCode:string, goodServiceCode:string , bidderCode:string,): Promise<ISpecialInfo> {
-    const resultBytes = await contract.evaluateTransaction('GetSpecialInfo',auctionCode,goodServiceCode,bidderCode);
+    var aesKey = fs2.readFileSync(aesKeyPath, 'utf-8');
+    const resultBytes = await contract.evaluateTransaction('GetSpecialInfo',aesKey,auctionCode,goodServiceCode,bidderCode);
     var resultJson = JSON.parse(utf8Decoder.decode(resultBytes));
     return resultJson;
 }
