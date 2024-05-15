@@ -486,7 +486,8 @@ async function getSpecialInfoAuction(auctionCode:string, goodServiceCode:string 
 }
 
 async function getBuenaProInfoAuction(auctionCode:string): Promise<Object> {
-    const resultBytes = await contract.evaluateTransaction('GetBuenaProInfo',auctionCode);
+    var aesKey = fs2.readFileSync(aesKeyPath, 'utf-8');
+    const resultBytes = await contract.evaluateTransaction('GetBuenaProInfo',aesKey,auctionCode);
     if(resultBytes.length == 0) return []
     var resultJson = JSON.parse(utf8Decoder.decode(resultBytes));
     return resultJson;
